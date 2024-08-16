@@ -109,6 +109,8 @@ typedef struct
   std::string frame_id;
   std::string io_method_name;
   std::string camera_info_url;
+  std::string left_camera_info_url;
+  std::string right_camera_info_url;
   // these parameters all have to be a combination supported by the device
   // Use
   // v4l2-ctl --device=0 --list-formats-ext

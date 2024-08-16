@@ -85,7 +85,15 @@ else()
     src/ros2/usb_cam_node.cpp
   )
 
+  ## Declare a ROS 2 composible node as a library
+  ament_auto_add_library(${PROJECT_NAME}_double_node SHARED
+    src/ros2/usb_cam_double_node.cpp
+  )
+
   target_link_libraries(${PROJECT_NAME}_node
+    ${PROJECT_NAME})
+
+  target_link_libraries(${PROJECT_NAME}_double_node
     ${PROJECT_NAME})
 
   ## Use node to generate an executable
@@ -93,12 +101,24 @@ else()
     PLUGIN "usb_cam::UsbCamNode"
     EXECUTABLE ${PROJECT_NAME}_node_exe
   )
+
+  ## Use node to generate an executable
+  rclcpp_components_register_node(${PROJECT_NAME}_double_node
+    PLUGIN "usb_cam::UsbCamDoubleNode"
+    EXECUTABLE ${PROJECT_NAME}_double_node_exe
+  )
+
   if(SANITIZE)
     target_compile_options(${PROJECT_NAME} PUBLIC -fsanitize=address -fsanitize=leak)
     target_link_libraries(${PROJECT_NAME} -fsanitize=address -fsanitize=leak)
+    
     target_compile_options(${PROJECT_NAME}_node PUBLIC -fsanitize=address -fsanitize=leak)
     target_link_libraries(${PROJECT_NAME}_node -fsanitize=address -fsanitize=leak)
     target_link_libraries(${PROJECT_NAME}_node_exe -fsanitize=address -fsanitize=leak)
+
+    target_compile_options(${PROJECT_NAME}_double_node PUBLIC -fsanitize=address -fsanitize=leak)
+    target_link_libraries(${PROJECT_NAME}_double_node -fsanitize=address -fsanitize=leak)
+    target_link_libraries(${PROJECT_NAME}_double_node_exe -fsanitize=address -fsanitize=leak)
   endif()
 endif()
 
@@ -152,6 +172,7 @@ else()
   install(TARGETS
     ${PROJECT_NAME}
     ${PROJECT_NAME}_node
+    ${PROJECT_NAME}_double_node
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION lib
