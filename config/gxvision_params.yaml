@@ -1,0 +1,25 @@
+/**:
+  ros__parameters:
+    video_device: "/dev/video0"
+    framerate: 10.0
+    io_method: "mmap"
+    frame_id: "camera"
+    pixel_format: "mjpeg2rgb"
+    av_device_format: "YUV422P"
+    image_width: 2560
+    image_height: 720
+    camera_name: "usb_cam"
+    camera_info_url: "package://usb_cam/config/camera_info.yaml"
+    left_camera_info_url: "file:///hyco_ros2/ros2/workspace/src/hyco_robot/hyco_camera/config/camera_parametrs/gxvision/left.yaml"
+    right_camera_info_url: "file:///hyco_ros2/ros2/workspace/src/hyco_robot/hyco_camera/config/camera_parametrs/gxvision/right.yaml"
+    brightness: -1
+    contrast: -1
+    saturation: -1
+    sharpness: -1
+    gain: -1
+    auto_white_balance: true
+    # white_balance: 4000
+    autoexposure: true
+    # exposure: 100
+    autofocus: false
+    focus: -1

@@ -67,6 +67,7 @@ public:
   void set_v4l2_params();
   void update();
   bool take_and_send_image();
+  void rectify_image(const cv::Mat &input_image, cv::Mat &output_image, const cv::Mat &camera_matrix, const cv::Mat &dist_coeffs); 
   void rotate_image_180(std::vector<uint8_t> &data, int width, int height, int step);
   std::pair<std::vector<uint8_t>, std::vector<uint8_t>> split_image(const std::vector<uint8_t> &data, int width, int height, int step);
   // bool take_and_send_image_mjpeg();
@@ -84,11 +85,17 @@ public:
   sensor_msgs::msg::Image::UniquePtr m_left_image_msg;
   sensor_msgs::msg::Image::UniquePtr m_right_image_msg;
 
+  sensor_msgs::msg::Image::UniquePtr m_left_rectified_image_msg;
+  sensor_msgs::msg::Image::UniquePtr m_right_rectified_image_msg;
+
   sensor_msgs::msg::CompressedImage::UniquePtr m_left_compressed_img_msg;
   sensor_msgs::msg::CompressedImage::UniquePtr m_right_compressed_img_msg;
 
   std::shared_ptr<image_transport::CameraPublisher> m_left_image_publisher;
   std::shared_ptr<image_transport::CameraPublisher> m_right_image_publisher;
+
+  std::shared_ptr<image_transport::CameraPublisher> m_left_rect_image_publisher;
+  std::shared_ptr<image_transport::CameraPublisher> m_right_rect_image_publisher;
 
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr m_left_compressed_image_publisher;
   rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr m_right_compressed_image_publisher;

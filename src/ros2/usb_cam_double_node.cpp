@@ -1,31 +1,3 @@
-// Copyright 2014 Robert Bosch, LLC
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-//    * Redistributions of source code must retain the above copyright
-//      notice, this list of conditions and the following disclaimer.
-//
-//    * Redistributions in binary form must reproduce the above copyright
-//      notice, this list of conditions and the following disclaimer in the
-//      documentation and/or other materials provided with the distribution.
-//
-//    * Neither the name of the Robert Bosch, LLC nor the names of its
-//      contributors may be used to endorse or promote products derived from
-//      this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
-
 #include <memory>
 #include <sstream>
 #include <string>
@@ -33,6 +5,9 @@
 #include <filesystem>
 #include "usb_cam/usb_cam_double_node.hpp"
 #include "usb_cam/utils.hpp"
+
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 const char BASE_TOPIC_NAME_LEFT[] = "left/image_raw";
 const char BASE_TOPIC_NAME_RIGHT[] = "right/image_raw";
@@ -47,6 +22,9 @@ namespace usb_cam
         m_left_image_msg(new sensor_msgs::msg::Image()),
         m_right_image_msg(new sensor_msgs::msg::Image()),
 
+        m_left_rectified_image_msg(new sensor_msgs::msg::Image()),
+        m_right_rectified_image_msg(new sensor_msgs::msg::Image()),
+
         m_left_compressed_img_msg(nullptr),
         m_right_compressed_img_msg(nullptr),
 
@@ -55,6 +33,13 @@ namespace usb_cam
                                                      rclcpp::QoS{100}.get_rmw_qos_profile()))),
         m_right_image_publisher(std::make_shared<image_transport::CameraPublisher>(
             image_transport::create_camera_publisher(this, BASE_TOPIC_NAME_RIGHT,
+                                                     rclcpp::QoS{100}.get_rmw_qos_profile()))),
+
+        m_left_rect_image_publisher(std::make_shared<image_transport::CameraPublisher>(
+            image_transport::create_camera_publisher(this, "left/image_rect",
+                                                     rclcpp::QoS{100}.get_rmw_qos_profile()))),
+        m_right_rect_image_publisher(std::make_shared<image_transport::CameraPublisher>(
+            image_transport::create_camera_publisher(this, "right/image_rect",
                                                      rclcpp::QoS{100}.get_rmw_qos_profile()))),
 
         m_left_compressed_image_publisher(nullptr),
@@ -509,6 +494,31 @@ namespace usb_cam
 
     auto stamp = m_camera->get_image_timestamp();
 
+    // Создание объектов cv::Mat для ректификации
+    cv::Mat left_img(height, width/2, CV_8UC2, left_image.data());
+    cv::Mat right_img(height, width/2, CV_8UC2, right_image.data());
+
+    cv::Mat left_rectified, right_rectified;
+
+    // Получаем информацию о камере
+    auto left_info = m_left_camera_info->getCameraInfo();
+    auto right_info = m_right_camera_info->getCameraInfo();
+
+    // Создаем матрицы для камеры и коэффициентов искажения
+    cv::Mat left_camera_matrix = cv::Mat(3, 3, CV_64F, const_cast<double*>(left_info.k.data()));
+    cv::Mat left_dist_coeffs = cv::Mat(1, 5, CV_64F, const_cast<double*>(left_info.d.data()));
+
+    cv::Mat right_camera_matrix = cv::Mat(3, 3, CV_64F, const_cast<double*>(right_info.k.data()));
+    cv::Mat right_dist_coeffs = cv::Mat(1, 5, CV_64F, const_cast<double*>(right_info.d.data()));
+
+    // Выполнение ректификации
+    this->rectify_image(left_img, left_rectified, left_camera_matrix, left_dist_coeffs);
+    this->rectify_image(right_img, right_rectified, right_camera_matrix, right_dist_coeffs);
+
+    // Преобразование обратно в std::vector<uint8_t> после ректификации
+    std::vector<uint8_t> left_rectified_data(left_rectified.data, left_rectified.data + left_rectified.total() * left_rectified.elemSize());
+    std::vector<uint8_t> right_rectified_data(right_rectified.data, right_rectified.data + right_rectified.total() * right_rectified.elemSize());
+
     m_left_image_msg->height = height;
     m_right_image_msg->height = height;
 
@@ -521,6 +531,10 @@ namespace usb_cam
     m_left_image_msg->step = step/2;
     m_right_image_msg->step = step/2;
 
+    // Создаем новые сообщения с помощью std::unique_ptr
+    m_left_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_left_image_msg);
+    m_right_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_right_image_msg);
+
     m_left_image_msg->data = left_image;
     m_right_image_msg->data = right_image;
 
@@ -529,15 +543,33 @@ namespace usb_cam
     m_right_image_msg->header.stamp.sec = stamp.tv_sec;
     m_right_image_msg->header.stamp.nanosec = stamp.tv_nsec;
 
+    // config rectify msgs adding data
+    m_left_rectified_image_msg->data = left_rectified_data;
+    m_right_rectified_image_msg->data = right_rectified_data;
+
+    // config camera info msgs
     *m_left_camera_info_msg = m_left_camera_info->getCameraInfo();
     *m_right_camera_info_msg = m_right_camera_info->getCameraInfo();
     m_left_camera_info_msg->header = m_left_image_msg->header;
     m_right_camera_info_msg->header = m_right_image_msg->header;
 
+    // publish images
     m_left_image_publisher->publish(*m_left_image_msg, *m_left_camera_info_msg);
     m_right_image_publisher->publish(*m_right_image_msg, *m_right_camera_info_msg);
+    
+    m_left_rect_image_publisher->publish(*m_left_rectified_image_msg, *m_left_camera_info_msg);
+    m_right_rect_image_publisher->publish(*m_right_rectified_image_msg, *m_right_camera_info_msg);
     return true;
   }
+
+  void UsbCamDoubleNode::rectify_image(const cv::Mat &input_image, cv::Mat &output_image, const cv::Mat &camera_matrix, const cv::Mat &dist_coeffs) 
+{
+    cv::Mat map1, map2;
+    cv::Size image_size = input_image.size();
+    cv::initUndistortRectifyMap(camera_matrix, dist_coeffs, cv::Mat(),
+                                 camera_matrix, image_size, CV_16SC2, map1, map2);
+    cv::remap(input_image, output_image, map1, map2, cv::INTER_LINEAR);
+}
 
   void UsbCamDoubleNode::rotate_image_180(std::vector<uint8_t> &data, int width, int height, int step)
   {
