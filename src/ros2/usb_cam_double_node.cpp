@@ -495,8 +495,10 @@ namespace usb_cam
     auto stamp = m_camera->get_image_timestamp();
 
     // Создание объектов cv::Mat для ректификации
-    cv::Mat left_img(height, width/2, CV_8UC2, left_image.data());
-    cv::Mat right_img(height, width/2, CV_8UC2, right_image.data());
+    // RCLCPP_INFO(this->get_logger(), "Rectifying image");
+    // RCLCPP_INFO(this->get_logger(), m_camera->get_pixel_format()->name().c_str());
+    cv::Mat left_img(height, width/2, CV_8UC3, left_image.data());
+    cv::Mat right_img(height, width/2, CV_8UC3, right_image.data());
 
     cv::Mat left_rectified, right_rectified;
 
@@ -520,28 +522,28 @@ namespace usb_cam
     std::vector<uint8_t> right_rectified_data(right_rectified.data, right_rectified.data + right_rectified.total() * right_rectified.elemSize());
 
     m_left_image_msg->height = height;
-    m_right_image_msg->height = height;
+    // m_right_image_msg->height = height;
 
-    m_left_image_msg->width = width/2;
-    m_right_image_msg->width = width/2;
+    m_left_image_msg->width = width / 2;
+    // m_right_image_msg->width = width / 2;
 
     m_left_image_msg->encoding = m_camera->get_pixel_format()->ros();
-    m_right_image_msg->encoding = m_camera->get_pixel_format()->ros();
+    // m_right_image_msg->encoding = m_camera->get_pixel_format()->ros();
 
-    m_left_image_msg->step = step/2;
-    m_right_image_msg->step = step/2;
-
-    // Создаем новые сообщения с помощью std::unique_ptr
-    m_left_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_left_image_msg);
-    m_right_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_right_image_msg);
-
-    m_left_image_msg->data = left_image;
-    m_right_image_msg->data = right_image;
+    m_left_image_msg->step = step / 2;
+    // m_right_image_msg->step = step / 2;
 
     m_left_image_msg->header.stamp.sec = stamp.tv_sec;
     m_left_image_msg->header.stamp.nanosec = stamp.tv_nsec;
-    m_right_image_msg->header.stamp.sec = stamp.tv_sec;
-    m_right_image_msg->header.stamp.nanosec = stamp.tv_nsec;
+    // m_right_image_msg->header.stamp.sec = stamp.tv_sec;
+    // m_right_image_msg->header.stamp.nanosec = stamp.tv_nsec;
+
+      // Создаем новые сообщения с помощью std::unique_ptr
+    m_left_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_left_image_msg);
+    m_right_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_left_image_msg);
+
+    m_left_image_msg->data = left_image;
+    // m_right_image_msg->data = right_image;
 
     // config rectify msgs adding data
     m_left_rectified_image_msg->data = left_rectified_data;
@@ -551,11 +553,11 @@ namespace usb_cam
     *m_left_camera_info_msg = m_left_camera_info->getCameraInfo();
     *m_right_camera_info_msg = m_right_camera_info->getCameraInfo();
     m_left_camera_info_msg->header = m_left_image_msg->header;
-    m_right_camera_info_msg->header = m_right_image_msg->header;
+    // m_right_camera_info_msg->header = m_right_image_msg->header;
 
     // publish images
     m_left_image_publisher->publish(*m_left_image_msg, *m_left_camera_info_msg);
-    m_right_image_publisher->publish(*m_right_image_msg, *m_right_camera_info_msg);
+    // m_right_image_publisher->publish(*m_right_image_msg, *m_right_camera_info_msg);
     
     m_left_rect_image_publisher->publish(*m_left_rectified_image_msg, *m_left_camera_info_msg);
     m_right_rect_image_publisher->publish(*m_right_rectified_image_msg, *m_right_camera_info_msg);
