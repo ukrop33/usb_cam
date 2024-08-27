@@ -67,8 +67,10 @@ public:
   void set_v4l2_params();
   void update();
   bool take_and_send_image();
-  void rectify_image(const cv::Mat &input_image, cv::Mat &output_image, const cv::Mat &camera_matrix, const cv::Mat &dist_coeffs); 
-  void rotate_image_180(std::vector<uint8_t> &data, int width, int height, int step);
+  void rectify_image(const cv::Mat &input_image, cv::Mat &output_image, 
+                                     const cv::Mat &camera_matrix, const cv::Mat &dist_coeffs, 
+                                     const cv::Mat &rectification_matrix, const cv::Mat &projection_matrix);
+  void rotate_image_180(std::vector<uint8_t> &data, int width, int height);
   std::pair<std::vector<uint8_t>, std::vector<uint8_t>> split_image(const std::vector<uint8_t> &data, int width, int height, int step);
   // bool take_and_send_image_mjpeg();
 

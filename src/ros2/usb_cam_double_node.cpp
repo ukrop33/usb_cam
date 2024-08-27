@@ -460,136 +460,138 @@ namespace usb_cam
   bool UsbCamDoubleNode::take_and_send_image()
   {
     // Получите размеры изображения
+    auto start_time = std::chrono::steady_clock::now();
     int width = m_camera->get_image_width();
     int height = m_camera->get_image_height();
     int step = m_camera->get_image_step();
     int image_size = m_camera->get_image_size_in_bytes();
-    // // Only resize if required
-    // if (sizeof(m_image_msg->data) != m_camera->get_image_size_in_bytes()) {
-    //   m_image_msg->width = m_camera->get_image_width();
-    //   m_image_msg->height = m_camera->get_image_height();
-    //   m_image_msg->encoding = m_camera->get_pixel_format()->ros();
-    //   m_image_msg->step = m_camera->get_image_step();
-    //   if (m_image_msg->step == 0) {
-    //     // Some formats don't have a linesize specified by v4l2
-    //     // Fall back to manually calculating it step = size / height
-    //     m_image_msg->step = m_camera->get_image_size_in_bytes() / m_image_msg->height;
-    //   }
-    //   m_image_msg->data.resize(m_camera->get_image_size_in_bytes());
-    // }
+    auto end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to get image properties: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
     // Создайте вектор для хранения сдвоенного изображения
     std::vector<uint8_t> double_image(image_size);
 
-    // grab the image, pass image msg buffer to fill
+    // Захват изображения
+    start_time = std::chrono::steady_clock::now();
     m_camera->get_image(reinterpret_cast<char *>(&double_image[0]));
+    end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to get image: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
-    // Rotate the image by 180 degrees
-    // this->rotate_image_180(double_image, width, height, step);
+    // Поворот изображения на 180 градусов
+    start_time = std::chrono::steady_clock::now();
+    this->rotate_image_180(double_image, width, height);
+    end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to rotate image: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
-    // Split the image into two halves
-    auto [left_image, right_image] = this->split_image(double_image, width, height, step);
-
-    // Process each half as needed
+    // Разделение изображения на две половины
+    start_time = std::chrono::steady_clock::now();
+    auto [right_image, left_image] = this->split_image(double_image, width, height, step);
+    end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to split image: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
     auto stamp = m_camera->get_image_timestamp();
 
-    // Создание объектов cv::Mat для ректификации
-    // RCLCPP_INFO(this->get_logger(), "Rectifying image");
-    // RCLCPP_INFO(this->get_logger(), m_camera->get_pixel_format()->name().c_str());
-    cv::Mat left_img(height, width/2, CV_8UC3, left_image.data());
-    cv::Mat right_img(height, width/2, CV_8UC3, right_image.data());
-
-    cv::Mat left_rectified, right_rectified;
-
-    // Получаем информацию о камере
+    // Получение информации о камере
+    start_time = std::chrono::steady_clock::now();
     auto left_info = m_left_camera_info->getCameraInfo();
     auto right_info = m_right_camera_info->getCameraInfo();
+    end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to get camera info: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
-    // Создаем матрицы для камеры и коэффициентов искажения
+    // Создание матриц для камеры и коэффициентов искажения
+    start_time = std::chrono::steady_clock::now();
     cv::Mat left_camera_matrix = cv::Mat(3, 3, CV_64F, const_cast<double*>(left_info.k.data()));
     cv::Mat left_dist_coeffs = cv::Mat(1, 5, CV_64F, const_cast<double*>(left_info.d.data()));
 
     cv::Mat right_camera_matrix = cv::Mat(3, 3, CV_64F, const_cast<double*>(right_info.k.data()));
     cv::Mat right_dist_coeffs = cv::Mat(1, 5, CV_64F, const_cast<double*>(right_info.d.data()));
 
+    cv::Mat left_rectification_matrix = cv::Mat(3, 3, CV_64F, const_cast<double*>(left_info.r.data()));
+    cv::Mat left_projection_matrix = cv::Mat(3, 4, CV_64F, const_cast<double*>(left_info.p.data()));
+
+    cv::Mat right_rectification_matrix = cv::Mat(3, 3, CV_64F, const_cast<double*>(right_info.r.data()));
+    cv::Mat right_projection_matrix = cv::Mat(3, 4, CV_64F, const_cast<double*>(right_info.p.data()));
+    end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to create matrices: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
+
     // Выполнение ректификации
-    this->rectify_image(left_img, left_rectified, left_camera_matrix, left_dist_coeffs);
-    this->rectify_image(right_img, right_rectified, right_camera_matrix, right_dist_coeffs);
+    start_time = std::chrono::steady_clock::now();
+    cv::Mat left_img(height, width / 2, CV_8UC3, left_image.data());
+    cv::Mat right_img(height, width / 2, CV_8UC3, right_image.data());
+
+    cv::Mat left_rectified, right_rectified;
+    this->rectify_image(left_img, left_rectified, left_camera_matrix, left_dist_coeffs, left_rectification_matrix, left_projection_matrix);
+    this->rectify_image(right_img, right_rectified, right_camera_matrix, right_dist_coeffs, right_rectification_matrix, right_projection_matrix);
+    end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to rectify images: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
     // Преобразование обратно в std::vector<uint8_t> после ректификации
+    start_time = std::chrono::steady_clock::now();
     std::vector<uint8_t> left_rectified_data(left_rectified.data, left_rectified.data + left_rectified.total() * left_rectified.elemSize());
     std::vector<uint8_t> right_rectified_data(right_rectified.data, right_rectified.data + right_rectified.total() * right_rectified.elemSize());
+    end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to convert rectified images: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
+    // Настройка сообщений для публикации
+    start_time = std::chrono::steady_clock::now();
     m_left_image_msg->height = height;
-    // m_right_image_msg->height = height;
-
     m_left_image_msg->width = width / 2;
-    // m_right_image_msg->width = width / 2;
-
     m_left_image_msg->encoding = m_camera->get_pixel_format()->ros();
-    // m_right_image_msg->encoding = m_camera->get_pixel_format()->ros();
-
     m_left_image_msg->step = step / 2;
-    // m_right_image_msg->step = step / 2;
-
     m_left_image_msg->header.stamp.sec = stamp.tv_sec;
     m_left_image_msg->header.stamp.nanosec = stamp.tv_nsec;
-    // m_right_image_msg->header.stamp.sec = stamp.tv_sec;
-    // m_right_image_msg->header.stamp.nanosec = stamp.tv_nsec;
 
-      // Создаем новые сообщения с помощью std::unique_ptr
     m_left_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_left_image_msg);
     m_right_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_left_image_msg);
 
     m_left_image_msg->data = left_image;
-    // m_right_image_msg->data = right_image;
-
-    // config rectify msgs adding data
     m_left_rectified_image_msg->data = left_rectified_data;
     m_right_rectified_image_msg->data = right_rectified_data;
 
-    // config camera info msgs
     *m_left_camera_info_msg = m_left_camera_info->getCameraInfo();
     *m_right_camera_info_msg = m_right_camera_info->getCameraInfo();
     m_left_camera_info_msg->header = m_left_image_msg->header;
-    // m_right_camera_info_msg->header = m_right_image_msg->header;
+    end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to configure messages: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
-    // publish images
+    // Публикация изображений
+    start_time = std::chrono::steady_clock::now();
     m_left_image_publisher->publish(*m_left_image_msg, *m_left_camera_info_msg);
-    // m_right_image_publisher->publish(*m_right_image_msg, *m_right_camera_info_msg);
-    
     m_left_rect_image_publisher->publish(*m_left_rectified_image_msg, *m_left_camera_info_msg);
     m_right_rect_image_publisher->publish(*m_right_rectified_image_msg, *m_right_camera_info_msg);
+    end_time = std::chrono::steady_clock::now();
+    // RCLCPP_INFO(this->get_logger(), "Time to publish images: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
+
     return true;
   }
 
-  void UsbCamDoubleNode::rectify_image(const cv::Mat &input_image, cv::Mat &output_image, const cv::Mat &camera_matrix, const cv::Mat &dist_coeffs) 
-{
+  void UsbCamDoubleNode::rectify_image(const cv::Mat &input_image, cv::Mat &output_image, 
+                                     const cv::Mat &camera_matrix, const cv::Mat &dist_coeffs, 
+                                     const cv::Mat &rectification_matrix, const cv::Mat &projection_matrix) 
+  {
     cv::Mat map1, map2;
     cv::Size image_size = input_image.size();
-    cv::initUndistortRectifyMap(camera_matrix, dist_coeffs, cv::Mat(),
-                                 camera_matrix, image_size, CV_16SC2, map1, map2);
+
+    // Создаем карты преобразования, аналогичные Python
+    cv::initUndistortRectifyMap(camera_matrix, dist_coeffs, rectification_matrix,
+                                projection_matrix, image_size, CV_32FC1, map1, map2);
+
+    // Применяем карту преобразования к изображению
     cv::remap(input_image, output_image, map1, map2, cv::INTER_LINEAR);
-}
-
-  void UsbCamDoubleNode::rotate_image_180(std::vector<uint8_t> &data, int width, int height, int step)
-  {
-    int row_size = step;
-    std::vector<uint8_t> temp_data(data.size());
-
-    for (int y = 0; y < height; ++y)
-    {
-      for (int x = 0; x < width; ++x)
-      {
-        int src_index = (y * row_size) + (x * (step / width));
-        int dst_index = ((height - y - 1) * row_size) + ((width - x - 1) * (step / width));
-        std::copy(data.begin() + src_index, data.begin() + src_index + (step / width), temp_data.begin() + dst_index);
-      }
-    }
-
-    data = std::move(temp_data);
   }
+
+void UsbCamDoubleNode::rotate_image_180(std::vector<uint8_t> &data, int width, int height)
+{
+    // Создание объекта cv::Mat из данных изображения
+    cv::Mat img(height, width, CV_8UC3, data.data());
+
+    // Поворот изображения на 180 градусов с использованием OpenCV
+    cv::Mat rotated_img;
+    cv::rotate(img, rotated_img, cv::ROTATE_180);
+
+    // Копирование данных обратно в вектор
+    std::copy(rotated_img.data, rotated_img.data + rotated_img.total() * rotated_img.elemSize(), data.begin());
+}
 
   std::pair<std::vector<uint8_t>, std::vector<uint8_t>> UsbCamDoubleNode::split_image(const std::vector<uint8_t> &data, int width, int height, int step)
 {
