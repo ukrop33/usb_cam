@@ -1,3 +1,30 @@
+# v4l2-ctl -d /dev/video0 --list-ctrls
+
+# User Controls
+
+#                      brightness 0x00980900 (int)    : min=-64 max=64 step=1 default=0 value=0
+#                        contrast 0x00980901 (int)    : min=0 max=64 step=1 default=32 value=20
+#                      saturation 0x00980902 (int)    : min=0 max=78 step=1 default=32 value=20
+#                             hue 0x00980903 (int)    : min=-2000 max=2000 step=1 default=0 value=0
+#         white_balance_automatic 0x0098090c (bool)   : default=1 value=1
+#                           gamma 0x00980910 (int)    : min=100 max=300 step=1 default=150 value=150
+#                            gain 0x00980913 (int)    : min=0 max=130 step=1 default=32 value=8
+#            power_line_frequency 0x00980918 (menu)   : min=0 max=2 default=1 value=1 (50 Hz)
+#       white_balance_temperature 0x0098091a (int)    : min=2800 max=6500 step=1 default=4600 value=4600 flags=inactive
+#                       sharpness 0x0098091b (int)    : min=1 max=7 step=1 default=2 value=2
+#          backlight_compensation 0x0098091c (int)    : min=0 max=1 step=1 default=0 value=0
+
+    # this->declare_parameter("brightness", 50); // 0-255, -1 "leave alone"
+    # this->declare_parameter("contrast", -1);   // 0-255, -1 "leave alone"
+    # this->declare_parameter("saturation", -1); // 0-255, -1 "leave alone"
+    # this->declare_parameter("sharpness", -1);  // 0-255, -1 "leave alone"
+    # this->declare_parameter("gain", -1);       // 0-100?, -1 "leave alone"
+    # this->declare_parameter("auto_white_balance", true);
+    # this->declare_parameter("white_balance", 4000);
+    # this->declare_parameter("autoexposure", true);
+    # this->declare_parameter("exposure", 100);
+    # this->declare_parameter("autofocus", false);
+    # this->declare_parameter("focus", -1); // 0-255, -1 "leave alone"
 /**:
   ros__parameters:
     video_device: "/dev/video0"
@@ -11,14 +38,10 @@
     camera_name: "usb_cam"
     left_camera_info_url: "file:///hyco_ros2/ros2/workspace/src/hyco_robot/hyco_camera/config/camera_parametrs/gxvision/left.yaml"
     right_camera_info_url: "file:///hyco_ros2/ros2/workspace/src/hyco_robot/hyco_camera/config/camera_parametrs/gxvision/right.yaml"
-    brightness: -1
-    contrast: -1
-    saturation: -1
-    sharpness: -1
-    gain: -1
-    auto_white_balance: true
-    # white_balance: 4000
-    autoexposure: true
-    # exposure: 100
-    autofocus: false
+    brightness: 0 # min=-64 max=64 step=1 default=0 value=0
+    contrast: 32 # min=0 max=64 step=1 default=32 value=20
+    saturation: 32 # min=0 max=78 step=1 default=32 value=20
+    sharpness: 2 # min=1 max=7 step=1 default=2 value=2
+    gain: 32 # min=0 max=130 step=1 default=32 value=8
+
     focus: -1
