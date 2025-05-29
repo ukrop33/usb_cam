@@ -479,7 +479,7 @@ namespace usb_cam
 
     // Поворот изображения на 180 градусов
     start_time = std::chrono::steady_clock::now();
-    this->rotate_image_180(double_image, width, height);
+    // this->rotate_image_180(double_image, width, height);
     end_time = std::chrono::steady_clock::now();
     // RCLCPP_INFO(this->get_logger(), "Time to rotate image: %ld ms", std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count());
 
@@ -543,8 +543,11 @@ namespace usb_cam
 
     m_left_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_left_image_msg);
     m_right_rectified_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_left_image_msg);
+    m_right_image_msg = std::make_unique<sensor_msgs::msg::Image>(*m_left_image_msg);
 
     m_left_image_msg->data = left_image;
+    m_right_image_msg->data = right_image;
+
     m_left_rectified_image_msg->data = left_rectified_data;
     m_right_rectified_image_msg->data = right_rectified_data;
 
@@ -557,6 +560,7 @@ namespace usb_cam
     // Публикация изображений
     start_time = std::chrono::steady_clock::now();
     m_left_image_publisher->publish(*m_left_image_msg, *m_left_camera_info_msg);
+    m_right_image_publisher->publish(*m_right_image_msg, *m_right_camera_info_msg);
     m_left_rect_image_publisher->publish(*m_left_rectified_image_msg, *m_left_camera_info_msg);
     m_right_rect_image_publisher->publish(*m_right_rectified_image_msg, *m_right_camera_info_msg);
     end_time = std::chrono::steady_clock::now();
