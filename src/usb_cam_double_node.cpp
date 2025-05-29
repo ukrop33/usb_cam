@@ -131,12 +131,18 @@ namespace usb_cam
     }
   }
 
-  std::string resolve_device_path(const std::string &path)
+  std::string resolve_device_path(const std::string & path)
   {
-    if (std::filesystem::is_symlink(path))
-    {
-      // For some reason read_symlink only returns videox
-      return "/dev/" + std::string(std::filesystem::read_symlink(path));
+    if (std::filesystem::is_symlink(path)) {
+      std::filesystem::path target_path = std::filesystem::read_symlink(path);
+
+      // if the target path is relative, resolve it
+      if (target_path.is_relative()) {
+        target_path = std::filesystem::absolute(path).parent_path() / target_path;
+        target_path = std::filesystem::canonical(target_path);
+      }
+
+      return target_path.string();
     }
     return path;
   }

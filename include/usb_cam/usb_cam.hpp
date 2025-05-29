@@ -96,16 +96,16 @@ std::vector<std::shared_ptr<pixel_format_base>> driver_supported_formats(
   return fmts;
 }
 
-typedef struct
+typedef struct capture_format_t
 {
   struct v4l2_fmtdesc format;
   struct v4l2_frmivalenum v4l2_fmt;
 } capture_format_t;
 
-typedef struct
+typedef struct parameters_t
 {
-  std::string camera_name;  // can be anything
-  std::string device_name;  // usually /dev/video0 or something similiar
+  std::string camera_name;
+  std::string device_name;
   std::string frame_id;
   std::string io_method_name;
   std::string camera_info_url;
@@ -132,9 +132,36 @@ typedef struct
   bool auto_white_balance;
   bool autoexposure;
   bool autofocus;
+
+  parameters_t()
+// *INDENT-OFF*
+    : camera_name("usb_cam"),
+    device_name("/dev/video0"),
+    frame_id("camera"),
+    io_method_name("mmap"),
+    camera_info_url("package://usb_cam/config/camera_info.yaml"),
+    pixel_format_name("yuyv2rgb"),
+    av_device_format("YUV422P"),
+    image_width(600),
+    image_height(480),
+    framerate(30.0),
+    brightness(-1),
+    contrast(-1),
+    saturation(-1),
+    sharpness(-1),
+    gain(-1),
+    white_balance(-1),
+    exposure(-1),
+    focus(-1),
+    auto_white_balance(true),
+    autoexposure(true),
+    autofocus(false)
+  {
+  }
+// *INDENT-ON*
 } parameters_t;
 
-typedef struct
+typedef struct image_t
 {
   char * data;
   size_t width;
@@ -403,13 +430,10 @@ private:
   image_t m_image;
 
   AVFrame * m_avframe;
-  int m_avframe_size;
   AVCodec * m_avcodec;
-  AVCodecID m_codec_id;
   AVDictionary * m_avoptions;
   AVCodecContext * m_avcodec_context;
 
-  int64_t m_buffer_time_us;
   bool m_is_capturing;
   int m_framerate;
   const time_t m_epoch_time_shift_us;
